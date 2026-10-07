@@ -1,5 +1,5 @@
 // Offline cache: the farm may have no signal, so everything is served cache-first.
-const CACHE = 'wuling-sky-v1';
+const CACHE = 'wuling-sky-v2';
 const FILES = ['./', 'index.html', 'app.js', 'astro.js', 'data.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {

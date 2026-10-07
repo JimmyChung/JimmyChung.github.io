@@ -16,6 +16,8 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; overscroll-behavior: none; }
   #sky { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+  #cam { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; background: #000; }
+  body.cam #cam { display: block; }
   button { font: inherit; color: inherit; background: rgba(255,255,255,0.08); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-height: 44px; cursor: pointer; }
   button.on { background: rgba(255, 210, 122, 0.22); border-color: var(--accent); color: var(--accent); }
   .bar { position: fixed; left: 0; right: 0; display: flex; gap: 8px; align-items: center; padding: 8px max(10px, env(safe-area-inset-left)); pointer-events: none; }
@@ -27,7 +29,7 @@
   #aim { position: fixed; left: 0; right: 0; bottom: calc(118px + env(safe-area-inset-bottom)); text-align: center; font-size: 13px; color: var(--dim); pointer-events: none; text-shadow: 0 0 4px #000; }
   #timeLabel { min-width: 140px; font-weight: 600; }
   .row2 { display: flex; gap: 8px; width: 100%; justify-content: center; }
-  .row2 button { flex: 1; max-width: 160px; }
+  .row2 button { flex: 1; min-width: 0; max-width: 160px; padding-left: 6px; padding-right: 6px; white-space: nowrap; }
   .panel, #info, #help { position: fixed; z-index: 10; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
   .panel { left: 50%; transform: translateX(-50%); top: max(10px, env(safe-area-inset-top)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(560px, calc(100% - 20px)); border-radius: 18px; display: flex; flex-direction: column; }
   .panel[hidden], #info[hidden], #help[hidden], #toast[hidden] { display: none; }
@@ -45,6 +47,7 @@
   #q { width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,0.06); color: var(--fg); margin-top: 12px; }
   .row { display: flex; justify-content: space-between; gap: 10px; width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 12px 4px; }
   #info { left: 50%; transform: translateX(-50%); bottom: calc(126px + env(safe-area-inset-bottom)); width: min(460px, calc(100% - 20px)); border-radius: 16px; padding: 14px 16px; line-height: 1.5; }
+  #info .fig { font-size: 30px; margin-right: 8px; vertical-align: -4px; }
   #info .t { font-size: 20px; font-weight: 700; color: var(--accent); padding-right: 40px; }
   #info .s { color: var(--fg); font-size: 14px; }
   #info p { margin: 8px 0 0; font-size: 14px; color: #cfd6f3; }
@@ -68,6 +71,7 @@
 </style>
 </head>
 <body>
+<video id="cam" playsinline muted autoplay></video>
 <canvas id="sky"></canvas>
 
 <div id="top" class="bar">
@@ -88,6 +92,7 @@
   <div class="row2">
     <button id="btnNow">現在</button>
     <button id="btnSensor">指向天空</button>
+    <button id="btnCam">📷 鏡頭</button>
     <button id="btnRed">紅光</button>
   </div>
 </div>
@@ -136,6 +141,9 @@
     <h3>指向模式方位微調 <span id="azCalV"></span></h3>
     <p class="dim">若手機指的方向和畫面差一點，可以把一顆認得的亮星對準畫面中央，再調這裡。</p>
     <input id="azCal" type="range" min="-30" max="30" step="1">
+    <h3>鏡頭視角 <span id="camFovV"></span></h3>
+    <p class="dim">鏡頭模式下，如果畫面上的星座比實際的大或小，調這裡。一般手機主鏡頭約 65～70°。</p>
+    <input id="camFov" type="range" min="45" max="90" step="1">
     <h3>其他</h3>
     <div class="stack"><button id="btnFull">全螢幕</button><button id="btnHelp">使用說明</button></div>
     <p class="dim" style="margin-top:20px">星表資料：Hipparcos／d3-celestial（BSD 授權）。行星、月亮位置為近似計算，誤差小於 1 度。</p>
@@ -148,6 +156,7 @@
     <li><b>拖曳</b>移動天空，<b>雙指</b>放大縮小</li>
     <li><b>點一下</b>星星、行星或星座名稱看介紹</li>
     <li><b>指向天空</b>：把手機舉向天空，畫面會跟著轉</li>
+    <li><b>📷 鏡頭</b>：打開相機，星座連線和圖案會疊在真實畫面上</li>
     <li><b>今晚</b>：日落、天黑時間、月相、推薦星座</li>
     <li><b>紅光</b>：夜間保護眼睛，不影響旁人</li>
     <li>時間可以調到 10/10 晚上，先預習要看什麼</li>

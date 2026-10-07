@@ -36,12 +36,29 @@
     Sge: '很小的箭頭形狀，在天鵝與天鷹之間。',
     Tri: '三角座星系 M33 在這裡，需要非常暗的天空。',
   };
+  // Picture for each constellation (drawn faintly behind the lines, so kids can see the shape)
+  const FIG = {
+    And: '👸', Ant: '💨', Aps: '🐦', Aqr: '🏺', Aql: '🦅', Ara: '🕯️', Ari: '🐏', Aur: '🐐', Boo: '🧑‍🌾', Cae: '🔨',
+    Cam: '🦒', Cnc: '🦀', CVn: '🐕', CMa: '🐕', CMi: '🐶', Cap: '🐐', Car: '⛵', Cas: '👑', Cen: '🐎', Cep: '🤴',
+    Cet: '🐳', Cha: '🦎', Cir: '📐', Col: '🕊️', Com: '💇', CrA: '👑', CrB: '👑', Crv: '🐦', Crt: '🏆', Cru: '✝️',
+    Cyg: '🦢', Del: '🐬', Dor: '🐠', Dra: '🐉', Equ: '🐴', Eri: '🌊', For: '🔥', Gem: '👬', Gru: '🐦', Her: '💪',
+    Hor: '🕰️', Hya: '🐍', Hyi: '🐍', Ind: '🪶', Lac: '🦎', Leo: '🦁', LMi: '🦁', Lep: '🐇', Lib: '⚖️', Lup: '🐺',
+    Lyn: '🐈', Lyr: '🎵', Men: '⛰️', Mic: '🔬', Mon: '🦄', Mus: '🪰', Nor: '📏', Oct: '🧭', Oph: '⚕️', Ori: '🏹',
+    Pav: '🦚', Peg: '🐎', Per: '⚔️', Phe: '🔥', Pic: '🎨', Psc: '🐟', PsA: '🐠', Pup: '⛵', Pyx: '🧭', Ret: '🕸️',
+    Sge: '➡️', Sgr: '🫖', Sco: '🦂', Scl: '🗿', Sct: '🛡️', Ser: '🐍', Sex: '📐', Tau: '🐂', Tel: '🔭', Tri: '🔺',
+    TrA: '🔺', Tuc: '🦜', UMa: '🐻', UMi: '🧸', Vel: '⛵', Vir: '👧', Vol: '🐟', Vul: '🦊',
+  };
+  // Pictures are drawn only for well-known constellations, so the sky does not get crowded
+  const FIG_SHOW = new Set(Object.keys(TIPS).concat(['Leo', 'Vir', 'Lib', 'Cnc', 'CMi', 'Lep', 'Cru', 'Cen', 'Lup', 'Col', 'Vul', 'Equ', 'Phe', 'Gru', 'Crv', 'Hya', 'Mon', 'Lyn', 'Cam', 'Eri']));
   const PLANETS = [
     ['mercury', '水星', '#c9b8a3'], ['venus', '金星', '#fff6d5'], ['mars', '火星', '#ff8a5c'],
     ['jupiter', '木星', '#ffe2b0'], ['saturn', '土星', '#f3d58f'], ['uranus', '天王星', '#b6f0f0'], ['neptune', '海王星', '#8fb6ff'],
   ];
   const DIRS = ['北', '東北', '東', '東南', '南', '西南', '西', '西北'];
   const dirName = (az) => DIRS[Math.round(az / 45) % 8];
+
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const normalize = (a) => { const r = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / r, a[1] / r, a[2] / r]; };
 
   // ---------- data prep ----------
   const NS = SKY.stars.length / 4;
@@ -56,6 +73,13 @@
     const o = { id: c.id, zh: c.zh, en: c.en, rank: c.rank, v: A.radec(c.c[0], c.c[1]),
       lines: c.l.map((l) => { const a = []; for (let k = 0; k < l.length; k += 2) a.push(A.radec(l[k], l[k + 1])); return a; }) };
     if (!consById[c.id]) consById[c.id] = o;
+    // centre of the stick figure and its angular radius, for sizing the picture
+    let sx = 0, sy = 0, sz = 0;
+    for (const l of o.lines) for (const v of l) { sx += v[0]; sy += v[1]; sz += v[2]; }
+    o.mid = normalize([sx, sy, sz]);
+    o.rad = 0;
+    for (const l of o.lines) for (const v of l) o.rad = Math.max(o.rad, Math.acos(Math.min(1, dot(o.mid, v))));
+    o.fig = FIG[c.id] || '';
     return o;
   });
   const names = SKY.names.map(([i, zh, en, c]) => ({ i, zh, en, c, mag: starMag[i], v: [starV[i * 3], starV[i * 3 + 1], starV[i * 3 + 2]] }));
@@ -90,7 +114,8 @@
     timeFixed: null, // null = live
     az: 135, alt: 40, fov: load('fov', 100),
     sensor: false, red: load('red', false), azCal: load('azCal', 0),
-    show: load('show', { lines: true, cname: true, sname: true, planets: true, dso: true, mw: true, grid: false }),
+    show: Object.assign({ lines: true, figures: true, cname: true, sname: true, planets: true, dso: true, mw: true, grid: false }, load('show', {})),
+    cam: false, camFov: load('camFov', 67), // camera mode; camFov = field of view across the photo's long side
     target: null,
   };
   const now = () => S.timeFixed == null ? Date.now() : S.timeFixed;
@@ -107,23 +132,28 @@
   // Camera basis in horizon coords (east, north, up)
   let camF = [0, 1, 0], camU = [0, 0, 1], camR = [1, 0, 0];
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-  const normalize = (a) => { const r = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / r, a[1] / r, a[2] / r]; };
   const hvec = (alt, az) => [Math.cos(alt * RAD) * Math.sin(az * RAD), Math.cos(alt * RAD) * Math.cos(az * RAD), Math.sin(alt * RAD)];
   function setManualCamera() {
     camF = hvec(S.alt, S.az);
     camR = [Math.cos(S.az * RAD), -Math.sin(S.az * RAD), 0];
     camU = cross(camR, camF);
   }
-  let scale = 1, cx = 0, cy = 0;
-  // Project horizon vector; returns [x, y, dz]
+  let scale = 1, cx = 0, cy = 0, viewFov = 100;
+  // Project horizon vector; returns [x, y, dz]. Stereographic normally; in camera mode
+  // rectilinear (like a camera lens) so the drawing lines up with the video.
   function proj(h) {
-    const dz = dot(h, camF), k = scale / (1 + Math.max(dz, -0.999));
+    const dz = dot(h, camF);
+    if (S.cam) {
+      if (dz < 0.08) return [cx, cy, -1];
+      return [cx + dot(h, camR) * scale / dz, cy - dot(h, camU) * scale / dz, dz];
+    }
+    const k = scale / (1 + Math.max(dz, -0.999));
     return [cx + dot(h, camR) * k, cy - dot(h, camU) * k, dz];
   }
   // Inverse projection: screen point -> horizon vector
   function unproj(x, y) {
     const X = (x - cx) / scale, Y = (cy - y) / scale, r2 = X * X + Y * Y;
+    if (S.cam) return normalize([0, 1, 2].map((i) => camR[i] * X + camU[i] * Y + camF[i]));
     const dz = (1 - r2) / (1 + r2), f = (1 + dz);
     return normalize([camR[0] * X * f + camU[0] * Y * f + camF[0] * dz, camR[1] * X * f + camU[1] * Y * f + camF[1] * dz, camR[2] * X * f + camU[2] * Y * f + camF[2] * dz]);
   }
@@ -144,7 +174,7 @@
   const H_ = (v) => A.applyM(M, v);
 
   // ---------- drawing ----------
-  let dirty = true, labelBoxes = [], hits = [];
+  let dirty = true, labelBoxes = [], hits = [], aimCon = null;
   function placeLabel(text, x, y, font, color, alpha, prio) {
     ctx.font = font;
     const w = ctx.measureText(text).width, h = parseInt(font, 10) || 12;
@@ -162,19 +192,31 @@
     if (!M || Math.abs(t - sceneT) > 500) computeScene(t);
     if (!S.sensor) setManualCamera();
     cx = W / 2; cy = H / 2;
-    scale = Math.min(W, H) / 2 / Math.tan(S.fov / 4 * RAD);
+    if (S.cam) {
+      // the video is scaled to cover the screen; its long side spans camFov degrees
+      const vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+      const longPx = Math.max(vw, vh) * Math.max(W / vw, H / vh);
+      scale = longPx / 2 / Math.tan(S.camFov / 2 * RAD);
+      viewFov = 2 * Math.atan(Math.min(W, H) / 2 / scale) * DEG;
+    } else {
+      scale = Math.min(W, H) / 2 / Math.tan(S.fov / 4 * RAD);
+      viewFov = S.fov;
+    }
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     labelBoxes = []; hits = [];
 
-    // sky background, brightened by the sun
+    // sky background, brightened by the sun (camera mode shows the video instead)
     const sunAlt = Math.asin(sunH[2]) * DEG;
-    const day = Math.max(0, Math.min(1, (sunAlt + 18) / 18));
-    const top = mix([4, 6, 18], [40, 90, 170], day), bot = mix([10, 16, 36], [120, 160, 210], day);
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, rgb(top)); g.addColorStop(1, rgb(bot));
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    const starFade = 1 - 0.85 * Math.max(0, Math.min(1, (sunAlt + 12) / 12));
-    const zf = Math.sqrt(100 / S.fov);
+    if (S.cam) ctx.clearRect(0, 0, W, H);
+    else {
+      const day = Math.max(0, Math.min(1, (sunAlt + 18) / 18));
+      const top = mix([4, 6, 18], [40, 90, 170], day), bot = mix([10, 16, 36], [120, 160, 210], day);
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, rgb(top)); g.addColorStop(1, rgb(bot));
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    const starFade = S.cam ? 1 : 1 - 0.85 * Math.max(0, Math.min(1, (sunAlt + 12) / 12));
+    const zf = Math.sqrt(100 / viewFov);
 
     // Milky Way: blobs on a quarter-resolution canvas, blurred, then upscaled for a soft glow
     if (S.show.mw) {
@@ -194,7 +236,7 @@
         }
         mc.fill();
       }
-      ctx.globalAlpha = 0.8 * starFade;
+      ctx.globalAlpha = (S.cam ? 0.35 : 0.8) * starFade;
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(mw, 0, 0, mw.width * q, mw.height * q);
       ctx.globalAlpha = 1;
@@ -202,9 +244,12 @@
 
     if (S.show.grid) drawGrid();
 
+    aimCon = constellationAt(camF);
+    if (S.show.figures) drawFigures();
+
     // constellation lines
     if (S.show.lines) {
-      ctx.strokeStyle = 'rgba(110,160,255,0.55)'; ctx.lineWidth = 1.1;
+      ctx.strokeStyle = S.cam ? 'rgba(150,195,255,0.9)' : 'rgba(110,160,255,0.55)'; ctx.lineWidth = S.cam ? 2 : 1.1;
       ctx.beginPath();
       for (const c of cons) {
         const hl = S.target && S.target.kind === 'con' && S.target.id === c.id;
@@ -213,13 +258,13 @@
       }
       ctx.stroke();
       if (S.target && S.target.kind === 'con') {
-        ctx.strokeStyle = 'rgba(255,220,120,0.95)'; ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255,220,120,0.95)'; ctx.lineWidth = S.cam ? 3 : 2;
         ctx.beginPath(); cons.filter((c) => c.id === S.target.id).forEach(traceCon); ctx.stroke();
       }
     }
 
     // stars
-    const lim = Math.max(4.6, Math.min(6.0, 5.0 + (100 - S.fov) / 60));
+    const lim = Math.max(4.6, Math.min(6.0, 5.0 + (100 - viewFov) / 60));
     ctx.globalAlpha = starFade;
     for (let i = 0; i < NS; i++) {
       const m = starMag[i];
@@ -244,8 +289,8 @@
     if (S.show.dso) {
       ctx.strokeStyle = 'rgba(160,255,200,0.6)'; ctx.lineWidth = 1;
       for (const d of dsos) {
-        const famous = d.zh && (d.mag < 5 || S.fov < 70);
-        if (!famous && S.fov > 60) continue;
+        const famous = d.zh && (d.mag < 5 || viewFov < 70);
+        if (!famous && viewFov > 60) continue;
         const p = proj(H_(d.v));
         if (!onScreen(p)) continue;
         ctx.beginPath(); ctx.ellipse(p[0], p[1], 5, 3.5, 0, 0, 6.2832); ctx.stroke();
@@ -261,7 +306,7 @@
       hits.push({ kind: 'sun', x: sp[0], y: sp[1] });
     }
     if (S.show.planets) for (const pl of planetsO) {
-      if (pl.mag > 6 && S.fov > 50) continue; // Uranus/Neptune need binoculars
+      if (pl.mag > 6 && viewFov > 50) continue; // Uranus/Neptune need binoculars
       const p = proj(pl.h);
       if (!onScreen(p)) continue;
       const r = Math.max(2.5, Math.min(6, (3 - pl.mag) * 0.9)) * Math.min(1.6, zf);
@@ -273,8 +318,8 @@
     const mp = proj(moonH);
     if (onScreen(mp)) { drawMoon(mp, sp); hits.push({ kind: 'moon', x: mp[0], y: mp[1] }); }
 
-    // ground
-    drawGround(sunAlt);
+    // ground (camera mode: the real ground is in the video, just mark the horizon)
+    if (S.cam) drawHorizonLine(); else drawGround(sunAlt);
 
     // labels (priority order)
     ctx.textBaseline = 'alphabetic';
@@ -283,7 +328,7 @@
     if (onScreen(mp)) placeLabel('月亮', mp[0], mp[1] - 14, 'bold 14px sans-serif', '#fff3c4', fade(moonH));
     if (onScreen(sp)) placeLabel('太陽', sp[0], sp[1] - 16, 'bold 14px sans-serif', '#ffe680', 1);
     if (S.show.cname) for (const c of cons) {
-      if (c.rank > (S.fov > 110 ? 1 : S.fov > 70 ? 2 : 3) && !(S.target && S.target.id === c.id)) continue;
+      if (c.rank > (viewFov > 110 ? 1 : viewFov > 70 ? 2 : 3) && !(S.target && S.target.id === c.id)) continue;
       const h = H_(c.v), p = proj(h);
       if (!onScreen(p, 0)) continue;
       const hl = S.target && S.target.kind === 'con' && S.target.id === c.id;
@@ -306,6 +351,47 @@
 
     drawTarget();
     drawCenter();
+  }
+
+  // The constellation being aimed at (screen centre) and the search target get a clear picture;
+  // the others stay faint.
+  function drawFigures() {
+    const tgt = S.target && S.target.kind === 'con' ? S.target.id : null;
+    const aimed = aimCon && aimCon.id;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const c of cons) {
+      if (!c.fig || !(FIG_SHOW.has(c.id) || c.id === tgt || c.id === aimed)) continue;
+      const p = proj(H_(c.mid));
+      const size = Math.min(Math.min(W, H) * 0.9, Math.max(28, 2 * c.rad * scale * 0.95));
+      if (p[2] < 0.2 || p[0] < -size / 2 || p[0] > W + size / 2 || p[1] < -size / 2 || p[1] > H + size / 2) continue;
+      ctx.globalAlpha = c.id === tgt ? 0.8 : c.id === aimed ? 0.65 : S.cam ? 0.25 : 0.14;
+      ctx.font = Math.round(size) + 'px sans-serif';
+      ctx.fillText(c.fig, p[0], p[1]);
+    }
+    ctx.globalAlpha = 1; ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+
+  function drawHorizonLine() {
+    ctx.strokeStyle = 'rgba(120,230,150,0.9)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    let pen = false;
+    for (let az = 0; az <= 360; az += 2) {
+      const p = proj(hvec(0, az));
+      if (p[2] < 0) { pen = false; continue; }
+      if (pen) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]);
+      pen = true;
+    }
+    ctx.stroke();
+    for (let i = 0; i < 8; i++) {
+      const p = proj(hvec(0, i * 45));
+      if (!onScreen(p, 0)) continue;
+      ctx.font = (i % 2 ? '14px' : 'bold 20px') + ' sans-serif';
+      const w = ctx.measureText(DIRS[i]).width;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(p[0] - w / 2 - 4, p[1] + 3, w + 8, 22);
+      ctx.fillStyle = i === 0 ? '#ff8a8a' : '#a6f0bc';
+      ctx.fillText(DIRS[i], p[0] - w / 2, p[1] + 20);
+      labelBoxes.push([p[0] - w / 2, p[1], p[0] + w / 2, p[1] + 24]);
+    }
   }
 
   function traceCon(c) {
@@ -442,7 +528,7 @@
     ctx.beginPath(); ctx.moveTo(cx - 12, cy); ctx.lineTo(cx - 4, cy); ctx.moveTo(cx + 4, cy); ctx.lineTo(cx + 12, cy);
     ctx.moveTo(cx, cy - 12); ctx.lineTo(cx, cy - 4); ctx.moveTo(cx, cy + 4); ctx.lineTo(cx, cy + 12); ctx.stroke();
     const [alt, az] = A.altAz(camF);
-    const con = constellationAt(camF);
+    const con = aimCon;
     document.getElementById('aim').textContent = (con ? '對準 ' + con.zh + ' ・ ' : '') + dirName(az) + ' ' + Math.round(az) + '° ・ 仰角 ' + Math.round(alt) + '°';
   }
 
@@ -519,7 +605,7 @@
   cv.addEventListener('pointerup', up);
   cv.addEventListener('pointercancel', (e) => { tapStart = null; up(e); });
   cv.addEventListener('wheel', (e) => { e.preventDefault(); setFov(S.fov * Math.exp(e.deltaY * 0.001)); }, { passive: false });
-  function setFov(f) { S.fov = Math.max(15, Math.min(160, f)); dirty = true; }
+  function setFov(f) { if (S.cam) return; S.fov = Math.max(15, Math.min(160, f)); dirty = true; }
 
   function pick(x, y) {
     let best = null, bd = 36;
@@ -544,9 +630,10 @@
       case 'sun': return { kind: 'sun', zh: '太陽', sub: '恆星' };
       case 'star': return { kind: 'star', zh: hh.o.zh, en: hh.o.en, v: hh.o.v, mag: hh.o.mag, sub: '恆星' + (consById[hh.o.c] ? ' ・ ' + consById[hh.o.c].zh : ''), con: hh.o.c };
       case 'dso': return { kind: 'dso', zh: (hh.o.zh || hh.o.id), en: hh.o.id, v: hh.o.v, mag: hh.o.mag, sub: hh.o.type };
-      case 'con': return { kind: 'con', id: hh.o.id, zh: hh.o.zh, en: hh.o.en, v: hh.o.v, sub: '星座', tip: TIPS[hh.o.id] };
+      case 'con': return conObj(hh.o);
     }
   }
+  const conObj = (c) => ({ kind: 'con', id: c.id, zh: c.zh, en: c.en, v: c.v, fig: c.fig, sub: '星座', tip: TIPS[c.id] });
   function altFnFor(o) {
     if (o.kind === 'planet') return (t) => A.altAz(A.applyM(A.horizonMatrix(t, S.lat, S.lon), A.planet(o.id, t).v))[0];
     if (o.kind === 'moon') return (t) => A.altAz(A.applyM(A.horizonMatrix(t, S.lat, S.lon), A.moon(t).v))[0] - 0.95;
@@ -565,7 +652,7 @@
     S.target = o; dirty = true;
     const h = targetH(), [alt, az] = A.altAz(h);
     infoEl.innerHTML = '<button class="x" aria-label="關閉">×</button>' +
-      '<div class="t">' + o.zh + (o.en && o.en !== o.zh ? ' <small>' + o.en + '</small>' : '') + '</div>' +
+      '<div class="t">' + (o.fig ? '<span class="fig">' + o.fig + '</span>' : '') + o.zh + (o.en && o.en !== o.zh ? ' <small>' + o.en + '</small>' : '') + '</div>' +
       '<div class="s">' + (o.sub || '') + (o.mag != null ? ' ・ 亮度 ' + o.mag.toFixed(1) + ' 等' : '') + '</div>' +
       '<div class="s">現在：' + dirName(az) + '方 ' + Math.round(az) + '° ・ 仰角 ' + Math.round(alt) + '°' + (alt < 0 ? '（在地平線下）' : '') + '</div>' +
       '<div class="s">' + riseSet(o) + '</div>' +
@@ -591,7 +678,7 @@
     items.push({ o: objectFromHit({ kind: 'moon' }), h: moonH, grp: '月亮與行星' });
     for (const p of planetsO) items.push({ o: objectFromHit({ kind: 'planet', o: p }), h: p.h, grp: '月亮與行星' });
     const seen = {};
-    for (const c of cons) { if (seen[c.id]) continue; seen[c.id] = 1; items.push({ o: { kind: 'con', id: c.id, zh: c.zh, en: c.en, v: c.v, sub: '星座', tip: TIPS[c.id] }, h: H_(c.v), grp: '星座', star: !!TIPS[c.id] }); }
+    for (const c of cons) { if (seen[c.id]) continue; seen[c.id] = 1; items.push({ o: conObj(c), h: H_(c.v), grp: '星座', star: !!TIPS[c.id] }); }
     for (const n of names) items.push({ o: objectFromHit({ kind: 'star', o: n }), h: H_(n.v), grp: '亮星' });
     for (const d of dsos) if (d.zh) items.push({ o: objectFromHit({ kind: 'dso', o: d }), h: H_(d.v), grp: '星團・星雲・星系' });
     const list = items.filter((it) => !q || it.o.zh.toLowerCase().includes(q) || (it.o.en || '').toLowerCase().includes(q));
@@ -600,7 +687,7 @@
     $('results').innerHTML = groups.map((g) => {
       const rows = list.filter((it) => it.grp === g);
       if (!rows.length) return '';
-      return '<h3>' + g + '</h3>' + rows.map((it) => '<button class="row" data-i="' + items.indexOf(it) + '"><span>' + (it.star ? '★ ' : '') + it.o.zh + (it.o.en && it.o.en !== it.o.zh ? ' <small>' + it.o.en + '</small>' : '') + '</span><span>' + visibilityText(it.h) + '</span></button>').join('');
+      return '<h3>' + g + '</h3>' + rows.map((it) => '<button class="row" data-i="' + items.indexOf(it) + '"><span>' + (it.o.fig ? it.o.fig + ' ' : '') + (it.star ? '★ ' : '') + it.o.zh + (it.o.en && it.o.en !== it.o.zh ? ' <small>' + it.o.en + '</small>' : '') + '</span><span>' + visibilityText(it.h) + '</span></button>').join('');
     }).join('');
     $('results').querySelectorAll('.row').forEach((b) => (b.onclick = () => {
       const it = items[+b.dataset.i];
@@ -656,7 +743,7 @@
       const tt = at(hh), m = A.horizonMatrix(tt, lat, lon);
       const vis = Object.keys(TIPS).map((id) => consById[id]).filter(Boolean)
         .map((c) => ({ c, a: A.altAz(A.applyM(m, c.v)) })).filter((x) => x.a[0] > 25).sort((a, b) => b.a[0] - a.a[0]);
-      html += '<h3>' + (hh === 21 ? '晚上 9 點' : '凌晨 1 點') + '值得找的星座</h3><p>' + vis.map((x) => '<span class="chip" data-id="' + x.c.id + '">' + x.c.zh + ' <small>' + dirName(x.a[1]) + '</small></span>').join(' ') + '</p>';
+      html += '<h3>' + (hh === 21 ? '晚上 9 點' : '凌晨 1 點') + '值得找的星座</h3><p>' + vis.map((x) => '<span class="chip" data-id="' + x.c.id + '">' + x.c.fig + ' ' + x.c.zh + ' <small>' + dirName(x.a[1]) + '</small></span>').join(' ') + '</p>';
     }
     html += '<h3>武陵觀星小提醒</h3><ul class="tips">' +
       '<li>武陵海拔約 1,750 公尺以上，十月夜晚可能只有 5～12°C，請帶厚外套、帽子、毯子。</li>' +
@@ -669,17 +756,19 @@
     $('tonightBody').querySelectorAll('.chip').forEach((el) => (el.onclick = () => {
       const c = consById[el.dataset.id];
       $('tonight').hidden = true;
-      showInfo({ kind: 'con', id: c.id, zh: c.zh, en: c.en, v: c.v, sub: '星座', tip: TIPS[c.id] });
+      showInfo(conObj(c));
       if (!S.sensor) panTo(targetH());
     }));
   }
   $('btnTonight').onclick = () => { openPanel('tonight'); buildTonight(); };
 
   // ---------- settings ----------
-  const toggles = { lines: '星座連線', cname: '星座名稱', sname: '亮星名稱', planets: '行星', dso: '星團星雲', mw: '銀河', grid: '高度方位格線' };
+  const toggles = { lines: '星座連線', figures: '星座圖案', cname: '星座名稱', sname: '亮星名稱', planets: '行星', dso: '星團星雲', mw: '銀河', grid: '高度方位格線' };
   $('toggles').innerHTML = Object.entries(toggles).map(([k, v]) => '<label><input type="checkbox" data-k="' + k + '"' + (S.show[k] ? ' checked' : '') + '> ' + v + '</label>').join('');
   $('toggles').querySelectorAll('input').forEach((el) => (el.onchange = () => { S.show[el.dataset.k] = el.checked; save('show', S.show); dirty = true; }));
   $('btnSettings').onclick = () => openPanel('settings');
+  $('camFov').value = S.camFov; $('camFovV').textContent = S.camFov + '°';
+  $('camFov').oninput = () => { S.camFov = +$('camFov').value; $('camFovV').textContent = S.camFov + '°'; save('camFov', S.camFov); dirty = true; };
   $('azCal').value = S.azCal; $('azCalV').textContent = S.azCal + '°';
   $('azCal').oninput = () => { S.azCal = +$('azCal').value; $('azCalV').textContent = S.azCal + '°'; save('azCal', S.azCal); };
   $('btnGps').onclick = () => {
@@ -718,7 +807,7 @@
   $('btnRed').onclick = () => { S.red = !S.red; save('red', S.red); applyRed(); };
 
   // ---------- device orientation ----------
-  let wakeLock = null, gotSensor = false;
+  let wakeLock = null, gotSensor = false, camWasOn = false;
   function onOrient(e) {
     let a = e.alpha, b = e.beta, g = e.gamma;
     if (e.webkitCompassHeading != null) a = 360 - e.webkitCompassHeading;
@@ -754,13 +843,43 @@
       toast('把手機舉向天空，畫面會跟著轉');
     } else {
       window.removeEventListener(evt, onOrient);
+      if (S.cam) setCamera(false); // camera mode needs the sensors
       const [alt, az] = A.altAz(camF); S.alt = Math.max(-30, Math.min(90, alt)); S.az = az;
       if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
     }
     dirty = true;
   }
   $('btnSensor').onclick = () => setSensor(!S.sensor);
+
+  // ---------- camera mode: live video behind the sky drawing ----------
+  const video = $('cam');
+  let camStream = null;
+  async function setCamera(on) {
+    if (on) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return toast('這個瀏覽器不能開鏡頭');
+      try {
+        camStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+      } catch (err) {
+        return toast(err && err.name === 'NotAllowedError' ? '請允許使用相機，才能開鏡頭模式' : '鏡頭打不開：' + (err && err.message || err));
+      }
+      video.srcObject = camStream;
+      video.play().catch(() => {});
+      S.cam = true; document.body.classList.add('cam');
+      if (!S.sensor) await setSensor(true);
+      if (S.cam) toast('把手機對準天空，星座圖案會疊在畫面上');
+    } else {
+      if (camStream) camStream.getTracks().forEach((t) => t.stop());
+      camStream = null; video.srcObject = null;
+      S.cam = false; document.body.classList.remove('cam');
+    }
+    $('btnCam').classList.toggle('on', S.cam);
+    dirty = true;
+  }
+  $('btnCam').onclick = () => setCamera(!S.cam);
+  video.addEventListener('loadedmetadata', () => { dirty = true; });
   document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && S.cam) { setCamera(false); camWasOn = true; }
+    else if (document.visibilityState === 'visible' && camWasOn) { camWasOn = false; setCamera(true); }
     if (document.visibilityState === 'visible' && S.sensor && navigator.wakeLock) navigator.wakeLock.request('screen').then((w) => (wakeLock = w)).catch(() => {});
   });
 
