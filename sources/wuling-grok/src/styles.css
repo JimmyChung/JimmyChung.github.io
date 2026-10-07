@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #07080d;
+  --color-surface: #141820;
+  --color-fg: #ebe6da;
+  --color-muted: #9aa3b5;
+  --color-line: #2c3344;
+  --color-accent: #e2b15a;
+  --color-accent-ink: #2a1c08;
+  --font-sans: "Noto Sans TC", "WenQuanYi Zen Hei", "PingFang TC", sans-serif;
+  --font-serif: "Noto Serif TC", "WenQuanYi Zen Hei", serif;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html,
+  body {
+    height: 100%;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    overscroll-behavior: none;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+.pad-safe-t {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+.pad-safe-b {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+input[type="range"] {
+  accent-color: var(--color-accent);
+  width: 100%;
+  height: 2.75rem;
+}

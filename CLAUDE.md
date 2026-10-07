@@ -7,7 +7,9 @@ https://jimmychung.github.io/ automatically.
 1. Put each project in its own folder: `<project-name>/` (lowercase, hyphens).
    It will be served at `https://jimmychung.github.io/<project-name>/`.
 2. Keep it static (HTML/CSS/JS). If a build step is needed, commit the built
-   output inside the folder; Pages here does not run a build.
+   output inside the folder; Pages here does not run a build. Keep the source
+   that produces it in `sources/<project-name>/` with a README on how to rebuild
+   (see `sources/wuling-grok/`).
 3. Use relative paths only (`app.js`, not `/app.js`), since the site lives in a subfolder.
 4. Add a card for the project to the root `index.html` (see the comment there).
 5. Test locally (`python3 -m http.server`, then a headless browser screenshot at

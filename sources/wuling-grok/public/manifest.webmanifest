@@ -1,0 +1,12 @@
+{
+  "name": "武陵觀星（Grok 版）",
+  "short_name": "武陵觀星",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#07080d",
+  "theme_color": "#07080d",
+  "lang": "zh-Hant",
+  "icons": [{ "src": "icon-180.png", "sizes": "180x180", "type": "image/png" }, { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
