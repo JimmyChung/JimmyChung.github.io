@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05070f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>武陵星空</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root { --bg: #05070f; --panel: rgba(16, 22, 40, 0.94); --fg: #e6ebff; --dim: #8b93b0; --accent: #ffd27a; --line: rgba(255,255,255,0.12); color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; overscroll-behavior: none; }
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+  button { font: inherit; color: inherit; background: rgba(255,255,255,0.08); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-height: 44px; cursor: pointer; }
+  button.on { background: rgba(255, 210, 122, 0.22); border-color: var(--accent); color: var(--accent); }
+  .bar { position: fixed; left: 0; right: 0; display: flex; gap: 8px; align-items: center; padding: 8px max(10px, env(safe-area-inset-left)); pointer-events: none; }
+  .bar > * { pointer-events: auto; }
+  #top { top: 0; padding-top: max(8px, env(safe-area-inset-top)); background: linear-gradient(rgba(5,7,15,0.85), rgba(5,7,15,0)); }
+  #top .title { font-weight: 700; font-size: 17px; letter-spacing: 1px; margin-right: auto; pointer-events: none; }
+  #top .title small { display: block; font-weight: 400; font-size: 12px; color: var(--dim); letter-spacing: 0; }
+  #bottom { bottom: 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); flex-wrap: wrap; justify-content: center; background: linear-gradient(rgba(5,7,15,0), rgba(5,7,15,0.9)); }
+  #aim { position: fixed; left: 0; right: 0; bottom: calc(118px + env(safe-area-inset-bottom)); text-align: center; font-size: 13px; color: var(--dim); pointer-events: none; text-shadow: 0 0 4px #000; }
+  #timeLabel { min-width: 140px; font-weight: 600; }
+  .row2 { display: flex; gap: 8px; width: 100%; justify-content: center; }
+  .row2 button { flex: 1; max-width: 160px; }
+  .panel, #info, #help { position: fixed; z-index: 10; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .panel { left: 50%; transform: translateX(-50%); top: max(10px, env(safe-area-inset-top)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(560px, calc(100% - 20px)); border-radius: 18px; display: flex; flex-direction: column; }
+  .panel[hidden], #info[hidden], #help[hidden], #toast[hidden] { display: none; }
+  .panel header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .panel header h2 { margin: 0; font-size: 18px; flex: 1; }
+  .panel .body { overflow-y: auto; padding: 4px 16px 20px; -webkit-overflow-scrolling: touch; }
+  .panel h3 { font-size: 15px; color: var(--accent); margin: 18px 0 8px; }
+  .panel table { width: 100%; border-collapse: collapse; }
+  .panel th { text-align: left; color: var(--dim); font-weight: 400; padding: 6px 10px 6px 0; white-space: nowrap; vertical-align: top; }
+  .panel td { padding: 6px 0; }
+  .panel ul { padding-left: 20px; margin: 4px 0; line-height: 1.6; }
+  .chip { display: inline-block; padding: 6px 10px; margin: 3px 2px; border-radius: 999px; background: rgba(143,179,255,0.15); border: 1px solid rgba(143,179,255,0.35); cursor: pointer; }
+  small { color: var(--dim); font-weight: 400; }
+  .dim { color: var(--dim); }
+  #q { width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,0.06); color: var(--fg); margin-top: 12px; }
+  .row { display: flex; justify-content: space-between; gap: 10px; width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 12px 4px; }
+  #info { left: 50%; transform: translateX(-50%); bottom: calc(126px + env(safe-area-inset-bottom)); width: min(460px, calc(100% - 20px)); border-radius: 16px; padding: 14px 16px; line-height: 1.5; }
+  #info .t { font-size: 20px; font-weight: 700; color: var(--accent); padding-right: 40px; }
+  #info .s { color: var(--fg); font-size: 14px; }
+  #info p { margin: 8px 0 0; font-size: 14px; color: #cfd6f3; }
+  #info .x { position: absolute; right: 8px; top: 8px; min-height: 36px; width: 36px; padding: 0; border-radius: 50%; }
+  #info .go { margin-top: 10px; width: 100%; }
+  #toggles label { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 16px; }
+  #toggles input { width: 22px; height: 22px; }
+  .stack { display: flex; flex-wrap: wrap; gap: 8px; }
+  input[type=range] { width: 100%; }
+  input[type=datetime-local] { font: inherit; font-size: 18px; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,0.06); color: var(--fg); width: 100%; color-scheme: dark; }
+  #help { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100% - 28px)); border-radius: 18px; padding: 18px 20px; line-height: 1.7; }
+  #help h2 { margin: 0 0 6px; color: var(--accent); }
+  #help ul { padding-left: 20px; margin: 6px 0 14px; }
+  #help button { width: 100%; }
+  #toast { position: fixed; z-index: 20; left: 50%; top: 80px; transform: translateX(-50%); background: rgba(0,0,0,0.8); padding: 10px 16px; border-radius: 999px; font-size: 14px; pointer-events: none; }
+  /* Red night-vision mode: multiply everything into the red channel and dim it */
+  #redLayer { position: fixed; inset: 0; z-index: 50; pointer-events: none; display: none; background: #ff2000; mix-blend-mode: multiply; }
+  body.red #redLayer { display: block; }
+  body.red { filter: brightness(0.75); }
+  @media (min-width: 700px) { #top .title { font-size: 20px; } button { padding: 10px 16px; } }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+
+<div id="top" class="bar">
+  <div class="title">武陵星空<small>點星星看名字・雙指縮放</small></div>
+  <button id="btnTonight">今晚</button>
+  <button id="btnSearch">搜尋</button>
+  <button id="btnSettings" aria-label="設定">設定</button>
+</div>
+
+<div id="aim"></div>
+
+<div id="bottom" class="bar">
+  <div class="row2">
+    <button id="btnMinus">−1 小時</button>
+    <button id="timeLabel"></button>
+    <button id="btnPlus">+1 小時</button>
+  </div>
+  <div class="row2">
+    <button id="btnNow">現在</button>
+    <button id="btnSensor">指向天空</button>
+    <button id="btnRed">紅光</button>
+  </div>
+</div>
+
+<div id="info" hidden></div>
+<div id="toast" hidden></div>
+
+<section id="search" class="panel" hidden>
+  <header><h2>搜尋星座・星星・行星</h2><button class="close">關閉</button></header>
+  <div class="body">
+    <input id="q" type="search" placeholder="例如：天鵝、織女、土星、M31" autocomplete="off">
+    <div id="results"></div>
+  </div>
+</section>
+
+<section id="tonight" class="panel" hidden>
+  <header><h2>今晚星空</h2><button class="close">關閉</button></header>
+  <div class="body" id="tonightBody"></div>
+</section>
+
+<section id="timePanel" class="panel" hidden>
+  <header><h2>選擇時間</h2><button class="close">關閉</button></header>
+  <div class="body">
+    <h3>台灣時間</h3>
+    <input id="dt" type="datetime-local">
+    <p><button id="dtOk" style="width:100%">確定</button></p>
+    <h3>武陵之夜（10/10）</h3>
+    <div class="stack">
+      <button data-preset="10-10-19">10/10 19:00</button>
+      <button data-preset="10-10-21">10/10 21:00</button>
+      <button data-preset="10-10-23">10/10 23:00</button>
+      <button data-preset="10-11-1">10/11 01:00</button>
+      <button data-preset="10-11-4">10/11 04:00</button>
+    </div>
+  </div>
+</section>
+
+<section id="settings" class="panel" hidden>
+  <header><h2>設定</h2><button class="close">關閉</button></header>
+  <div class="body">
+    <h3>顯示</h3>
+    <div id="toggles"></div>
+    <h3>地點</h3>
+    <p id="locStatus" class="dim">武陵農場 24.36°N 121.31°E</p>
+    <div class="stack"><button id="btnWuling">武陵農場</button><button id="btnGps">用 GPS 目前位置</button></div>
+    <h3>指向模式方位微調 <span id="azCalV"></span></h3>
+    <p class="dim">若手機指的方向和畫面差一點，可以把一顆認得的亮星對準畫面中央，再調這裡。</p>
+    <input id="azCal" type="range" min="-30" max="30" step="1">
+    <h3>其他</h3>
+    <div class="stack"><button id="btnFull">全螢幕</button><button id="btnHelp">使用說明</button></div>
+    <p class="dim" style="margin-top:20px">星表資料：Hipparcos／d3-celestial（BSD 授權）。行星、月亮位置為近似計算，誤差小於 1 度。</p>
+  </div>
+</section>
+
+<div id="help" hidden>
+  <h2>武陵星空 使用說明</h2>
+  <ul>
+    <li><b>拖曳</b>移動天空，<b>雙指</b>放大縮小</li>
+    <li><b>點一下</b>星星、行星或星座名稱看介紹</li>
+    <li><b>指向天空</b>：把手機舉向天空，畫面會跟著轉</li>
+    <li><b>今晚</b>：日落、天黑時間、月相、推薦星座</li>
+    <li><b>紅光</b>：夜間保護眼睛，不影響旁人</li>
+    <li>時間可以調到 10/10 晚上，先預習要看什麼</li>
+    <li>建議先「加到主畫面」，山上沒訊號也能用</li>
+  </ul>
+  <button id="helpOk">開始看星星</button>
+</div>
+
+<div id="redLayer"></div>
+
+<script src="data.js"></script>
+<script src="astro.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

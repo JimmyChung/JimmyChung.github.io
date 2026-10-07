@@ -1,0 +1,33 @@
+# 武陵星空 🌌
+
+武陵農場觀星用的網頁星座盤，手機、平板都能用，加到主畫面後**沒有網路也能用**。
+
+網址（開啟 GitHub Pages 後）：https://jimmychung.github.io/wuling-stargazing/
+
+## 功能
+- 星座連線與中文名稱、亮星名稱、銀河、星團星雲（M31、昴宿星團…）
+- 行星與月亮位置（含月相），點一下看介紹、方位、升起／落下時間
+- **指向天空**：用手機指南針與陀螺儀，舉起手機就顯示那個方向的星空
+- **今晚**：日落、完全天黑時間、月相、看得到的行星、推薦星座、武陵觀星提醒
+- **搜尋**：找星座／星星／行星，畫面會出現箭頭指引方向
+- 時間可調整（含 10/10 晚上快速按鈕），可預習當晚星空
+- **紅光模式**保護夜視、全螢幕、可改用 GPS 目前位置
+
+## 部署（只要做一次）
+1. GitHub repo → **Settings → Pages**
+2. Source 選 **Deploy from a branch**，Branch 選這個分支、資料夾選 `/ (root)` → Save
+3. 約 1 分鐘後即可用上面的網址開啟
+
+## 在 Android 手機／平板安裝
+1. 用 Chrome 開啟網址
+2. 右上角 ⋮ → **加到主畫面／安裝應用程式**
+3. 出發前在有網路的地方打開一次，之後在山上離線也能用
+
+## 開發
+純 HTML/JS，無需建置。本機測試：`python3 -m http.server` 後開 http://localhost:8000
+（方向感應器需要 HTTPS，GitHub Pages 已提供）。
+
+- `data.js`：由 `tools/build_data.py` 從 [d3-celestial](https://github.com/ofrohn/d3-celestial)（BSD-3）星表產生
+- `astro.js`：太陽、月亮、行星位置的近似計算（誤差 < 1°）
+- `app.js`：繪圖、操作、感應器
+- `sw.js`：離線快取

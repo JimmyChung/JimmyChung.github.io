@@ -1,0 +1,16 @@
+{
+  "name": "武陵星空",
+  "short_name": "武陵星空",
+  "description": "武陵農場觀星用的星座盤：指向天空就能看到星座、亮星與行星。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#05070f",
+  "theme_color": "#05070f",
+  "lang": "zh-Hant",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
